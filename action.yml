@@ -1,0 +1,47 @@
+name: 'nomad'
+description: 'Run Nomad deploys'
+inputs:
+  ssh_user:
+    description: 'User name for the SSH tunnel'
+    required: true
+
+  ssh_host:
+    description: 'Host name for the SSH tunnel'
+    required: true
+
+  id_rsa:
+    description: 'SSH secret key used for SSH connections'
+    required: true
+
+  docker_image:
+    description: 'Docker image to use during the deployment process'
+    required: true
+
+  tag:
+    description: 'Docker tag to use during the deployment process'
+    required: true
+
+  wait:
+    description: 'Wait for the job to complete'
+    default: 'false'
+    required: true
+
+  branch_name:
+    description: 'Name of the branch that is being deployed'
+    required: false
+
+  job_name:
+    description: 'Nomad job name to trigger'
+    required: true
+
+  nomad_url:
+    description: 'Informative Nomad url to check the progress'
+    required: true
+
+  job_related_service:
+    description: 'Service job name'
+    required: true
+
+runs:
+  using: docker
+  image: 'Dockerfile'
