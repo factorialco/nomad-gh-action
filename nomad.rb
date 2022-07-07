@@ -95,13 +95,13 @@ class NomadJobExecutor
   # Updates a job and changes its images to the one being deployed
   def deploy!(
     job:,
-    wait: false
+    wait:
   )
     response = client.post("/v1/job/#{job['Name']}", { 'Job' => job , 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
-    return Result.ok(response) unless wait
+    return Result.ok(response) if wait.empty?
 
     eval_id = response[:EvalID]
-    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == 'complete' })
+    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == wait })
     allocations = client.get("/v1/evaluation/#{eval_id}/allocations")
 
     if allocations.empty?

@@ -10,16 +10,12 @@ echo "$INPUT_ID_RSA" > /id_rsa
 ruby << EOF
   require './deploy.rb'
 
-  def true?(obj)
-    obj.to_s.downcase == "true"
-  end
-
   deploy = Deploy.new(
     ssh_user: '$INPUT_SSH_USER',
     ssh_host: '$INPUT_SSH_HOST',
     docker_image: '$INPUT_DOCKER_IMAGE',
     tag: '$INPUT_TAG',
-    wait: true?('$INPUT_WAIT'),
+    wait: '$INPUT_WAIT',
     branch_name: '$INPUT_BRANCH_NAME',
     job_name: '$INPUT_JOB_NAME',
     nomad_url: '$INPUT_NOMAD_URL',
