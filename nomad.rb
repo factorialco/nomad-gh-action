@@ -101,7 +101,7 @@ class NomadJobExecutor
     return Result.ok(response) if wait.empty?
 
     eval_id = response[:EvalID]
-    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| p "Get evaluation #{eval_id}"; p r.inspect; r[:Status] == wait })
+    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| p "Get evaluation #{eval_id}"; p r[:Name]; p r[:JobID]; p r[:Status]; r[:Status] == wait })
     allocations = client.get("/v1/evaluation/#{eval_id}/allocations")
 
     if allocations.empty?
@@ -114,7 +114,7 @@ class NomadJobExecutor
         "/v1/allocation/#{allocation[:ID]}",
         {},
         {},
-        proc { |r| "Get allocation #{allocation[:ID]}"; p r.inspect; r[:ClientStatus] == 'complete' },
+        proc { |r| "Get allocation #{allocation[:ID]}"; p r[:Name]; p r[:JobID]; p r[:Status]; r[:ClientStatus] == 'complete' },
         proc { |r| r[:ClientStatus] == 'failed' }
       )
       return job_error_result(result.data) if result.error?
