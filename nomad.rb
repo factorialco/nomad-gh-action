@@ -101,7 +101,7 @@ class NomadJobExecutor
     return Result.ok(response) if wait.empty?
 
     eval_id = response[:EvalID]
-    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == wait })
+    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| p r.inspect; r[:Status] == wait })
     allocations = client.get("/v1/evaluation/#{eval_id}/allocations")
 
     if allocations.empty?
