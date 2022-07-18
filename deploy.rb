@@ -1,14 +1,15 @@
 require './nomad.rb'
 
 class Deploy
-  attr_accessor :ssh_user, :ssh_host, :docker_image, :tag, :wait, :branch_name, :job_name, :nomad_url, :job_related_service
+  attr_accessor :ssh_user, :ssh_host, :docker_image, :tag, :wait_status, :wait_task_group, :branch_name, :job_name, :nomad_url, :job_related_service
 
-  def initialize(ssh_user:, ssh_host:, docker_image:, tag:, wait:, branch_name:, job_name:, nomad_url:, job_related_service:)
+  def initialize(ssh_user:, ssh_host:, docker_image:, tag:, wait_status:, wait_task_group:, branch_name:, job_name:, nomad_url:, job_related_service:)
     @ssh_user = ssh_user
     @ssh_host = ssh_host
     @docker_image = docker_image
     @tag = tag
-    @wait = wait
+    @wait_status = wait_status
+    @wait_task_group = wait_task_group
     @branch_name = branch_name
     @job_name = job_name
     @nomad_url = nomad_url
@@ -22,7 +23,7 @@ class Deploy
     puts "ℹ️ You can check the progress in #{nomad_url}"
     job = nomad.update_image(image: docker_image, tag: tag, job: nomad.job(job_name, related_service: job_related_service))
     job = nomad.set_deployed_info(job: job, user: ssh_user, branch: branch_name)
-    result = nomad.deploy!(job: job, wait: wait)
+    result = nomad.deploy!(job: job, wait_status: wait_status, wait_task_group: wait_task_group)
 
     if result.error?
       puts "🔴 Error trying to execute '#{job_name}' job"

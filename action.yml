@@ -21,8 +21,13 @@ inputs:
     description: 'Docker tag to use during the deployment process'
     required: true
 
-  wait:
-    description: 'Wait for the job to be in this state'
+  wait_status:
+    description: 'Wait for the allocation to be in this status'
+    default: ''
+    required: false
+
+  wait_task_group:
+    description: 'Task group name to wait for'
     default: ''
     required: false
 

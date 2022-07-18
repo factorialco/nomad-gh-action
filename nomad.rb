@@ -95,14 +95,19 @@ class NomadJobExecutor
   # Updates a job and changes its images to the one being deployed
   def deploy!(
     job:,
-    wait:
+    wait_status:,
+    wait_task_group:
   )
     response = client.post("/v1/job/#{job['Name']}", { 'Job' => job , 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
-    return Result.ok(response) if wait.empty?
+    return Result.ok(response) if wait_status.empty?
 
     eval_id = response[:EvalID]
-    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == wait })
-    allocations = client.get("/v1/evaluation/#{eval_id}/allocations")
+    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == 'complete' })
+    allocations = client.get("/v1/evaluation/#{eval_id}/allocations").filter do |allocation|
+      next true if wait_task_group.empty?
+
+      allocation[:TaskGroup] == wait_task_group
+    end
 
     if allocations.empty?
       puts 'Nothing was run'
@@ -114,7 +119,7 @@ class NomadJobExecutor
         "/v1/allocation/#{allocation[:ID]}",
         {},
         {},
-        proc { |r| r[:ClientStatus] == 'complete' },
+        proc { |r| r[:ClientStatus] == wait_status },
         proc { |r| r[:ClientStatus] == 'failed' }
       )
       return job_error_result(result.data) if result.error?
