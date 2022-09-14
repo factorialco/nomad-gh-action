@@ -41,17 +41,48 @@ class NomadJobExecutor
   end
 
   def client
-    @client ||= TunneledClient.new(self)
-  end
-
-  def gw_open
-    gateway.open('nomad.service.consul', 4646, 4646) do
-      yield
+    gw_open do |port|
+      original_client = Nomad::Client.new(address: "http://localhost:#{port}")
+      client = ExtendedNomadClient.new(original_client)
+      yield client
     end
   end
 
-  def job(job_name, options = {})
-    client.get("/v1/job/#{job_name}")
+  def gw_open
+    gateway.open('localhost', 4646) do |port|
+      yield port
+    end
+  end
+
+
+end
+
+class ExtendedNomadClient
+  def initialize(original_client)
+    @client = original_client
+  end
+
+  def get_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
+    req_until(:get, path, params, headers, wait_clause, error_clause)
+  end
+
+  def post_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
+    req_until(:post, path, params, headers, wait_clause, error_clause)
+  end
+
+  def req_until(verb, path, params, headers, wait_clause, error_clause)
+    loop do
+      response = send(verb, path, params, headers)
+      return Result.ok(data: response) if wait_clause.call(response)
+      return Result.error(data: response) if error_clause.call(response)
+
+      puts('Waiting')
+      sleep 1
+    end
+  end
+
+  def get_job(job_name, options = {})
+    get("/v1/job/#{job_name}")
   rescue ::Nomad::HTTPError
     puts 'Job not found in remote Nomad server, will try run it remotely and retry'
     gateway.ssh(options[:related_service], user, keys: ['/id_rsa']) do |ssh|
@@ -59,7 +90,7 @@ class NomadJobExecutor
 
       # FIXME: Generic
       job_spec = ssh.exec!("cat /etc/nomad/jobs.d/#{job_name}.nomad")
-      client.post('/v1/jobs/parse', {'JobHCL' => job_spec}.to_json)
+      post('/v1/jobs/parse', {'JobHCL' => job_spec}.to_json)
     end
   rescue ::Nomad::HTTPError
     puts 'Job not found and in remote Nomad server'
@@ -89,7 +120,7 @@ class NomadJobExecutor
   end
 
   def versions(job_name)
-    client.get("/v1/job/#{job_name}/versions")[:Versions]
+    get("/v1/job/#{job_name}/versions")[:Versions]
   end
 
   # Updates a job and changes its images to the one being deployed
@@ -98,12 +129,12 @@ class NomadJobExecutor
     wait_status:,
     wait_task_group:
   )
-    response = client.post("/v1/job/#{job['Name']}", { 'Job' => job , 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
+    response = post("/v1/job/#{job['Name']}", { 'Job' => job , 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
     return Result.ok(response) if wait_status.empty?
 
     eval_id = response[:EvalID]
-    client.get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == 'complete' })
-    allocations = client.get("/v1/evaluation/#{eval_id}/allocations").filter do |allocation|
+    get_until("/v1/evaluation/#{eval_id}", {}, {}, proc { |r| r[:Status] == 'complete' })
+    allocations = get("/v1/evaluation/#{eval_id}/allocations").filter do |allocation|
       next true if wait_task_group.empty?
 
       allocation[:TaskGroup] == wait_task_group
@@ -115,7 +146,7 @@ class NomadJobExecutor
     end
 
     allocations.each do |allocation|
-      result = client.get_until(
+      result = get_until(
         "/v1/allocation/#{allocation[:ID]}",
         {},
         {},
@@ -152,7 +183,7 @@ class NomadJobExecutor
   private
 
   def allocation_log(allocation_id:, task_name:, type:)
-    data = client.get("/v1/client/fs/logs/#{allocation_id}?type=#{type}&task=#{task_name}")[:Data]
+    data = get("/v1/client/fs/logs/#{allocation_id}?type=#{type}&task=#{task_name}")[:Data]
     Base64.decode64(data)
   rescue ::Nomad::HTTPClientError,::JSON::ParserError => e
     puts 'There was an error trying to obtain allocation log'
@@ -160,35 +191,7 @@ class NomadJobExecutor
     ''
   end
 
-end
-
-class TunneledClient
-  def initialize(caller_object)
-    @caller_object = caller_object
-  end
-
-  def get_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
-    req_until(:get, path, params, headers, wait_clause, error_clause)
-  end
-
-  def post_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
-    req_until(:post, path, params, headers, wait_clause, error_clause)
-  end
-
-  def req_until(verb, path, params, headers, wait_clause, error_clause)
-    loop do
-      response = send(verb, path, params, headers)
-      return Result.ok(data: response) if wait_clause.call(response)
-      return Result.error(data: response) if error_clause.call(response)
-
-      puts('Waiting')
-      sleep 1
-    end
-  end
-
-  # We call Nomad::Client, but wrapping the call in a tunnel so we can ssh to the host
-  # before making the call
   def method_missing(method, *args)
-    @caller_object.gw_open { ::Nomad.client.send(method, *args) }
+    @client.send(method, *args)
   end
 end
