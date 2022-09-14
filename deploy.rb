@@ -17,21 +17,22 @@ class Deploy
   end
 
   def run!
-    puts "📠 Executing '#{job_name}' job into #{job_related_service} through ssh://#{ssh_user}@#{ssh_host}"
-    nomad = NomadJobExecutor.new(host: ssh_host, user: ssh_user)
+    NomadJobExecutor.new(host: ssh_host, user: ssh_user).client do |nomad|
+      puts "📠 Executing '#{job_name}' job into #{job_related_service} through ssh://#{ssh_user}@#{ssh_host}"
 
-    puts "ℹ️ You can check the progress in #{nomad_url}"
-    job = nomad.update_image(image: docker_image, tag: tag, job: nomad.job(job_name, related_service: job_related_service))
-    job = nomad.set_deployed_info(job: job, user: ssh_user, branch: branch_name)
-    result = nomad.deploy!(job: job, wait_status: wait_status, wait_task_group: wait_task_group)
+      puts "ℹ️ You can check the progress in #{nomad_url}"
+      job = nomad.update_image(image: docker_image, tag: tag, job: nomad.get_job(job_name, related_service: job_related_service))
+      job = nomad.set_deployed_info(job: job, user: ssh_user, branch: branch_name)
+      result = nomad.deploy!(job: job, wait_status: wait_status, wait_task_group: wait_task_group)
 
-    if result.error?
-      puts "🔴 Error trying to execute '#{job_name}' job"
-      show_result_error(result)
-      exit(1)
+      if result.error?
+        puts "🔴 Error trying to execute '#{job_name}' job"
+        show_result_error(result)
+        exit(1)
+      end
+
+      puts "🚀 Completed '#{job_name}' job!"
     end
-
-    puts "🚀 Completed '#{job_name}' job!"
   end
 
   private
