@@ -58,8 +58,9 @@ class NomadJobExecutor
 end
 
 class ExtendedNomadClient
-  def initialize(original_client)
+  def initialize(original_client, gateway)
     @client = original_client
+    @gateway = gateway
   end
 
   def get_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
@@ -85,7 +86,7 @@ class ExtendedNomadClient
     get("/v1/job/#{job_name}")
   rescue ::Nomad::HTTPError
     puts 'Job not found in remote Nomad server, will try run it remotely and retry'
-    gateway.ssh(options[:related_service], user, keys: ['/id_rsa']) do |ssh|
+    @gateway.ssh(options[:related_service], user, keys: ['/id_rsa']) do |ssh|
       puts "Executing `nomad run /etc/nomad/jobs.d/#{job_name}.nomad` in remote location"
 
       # FIXME: Generic

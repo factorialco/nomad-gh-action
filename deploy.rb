@@ -21,7 +21,7 @@ class Deploy
       puts "📠 Executing '#{job_name}' job into #{job_related_service} through ssh://#{ssh_user}@#{ssh_host}"
 
       puts "ℹ️ You can check the progress in #{nomad_url}"
-      job = nomad.update_image(image: docker_image, tag: tag, job: nomad.job(job_name, related_service: job_related_service))
+      job = nomad.update_image(image: docker_image, tag: tag, job: nomad.get_job(job_name, related_service: job_related_service))
       job = nomad.set_deployed_info(job: job, user: ssh_user, branch: branch_name)
       result = nomad.deploy!(job: job, wait_status: wait_status, wait_task_group: wait_task_group)
     end
