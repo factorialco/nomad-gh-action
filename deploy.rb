@@ -24,7 +24,6 @@ class Deploy
       job = nomad.update_image(image: docker_image, tag: tag, job: nomad.get_job(job_name, related_service: job_related_service))
       job = nomad.set_deployed_info(job: job, user: ssh_user, branch: branch_name)
       result = nomad.deploy!(job: job, wait_status: wait_status, wait_task_group: wait_task_group)
-    end
 
       if result.error?
         puts "🔴 Error trying to execute '#{job_name}' job"
@@ -33,6 +32,7 @@ class Deploy
       end
 
       puts "🚀 Completed '#{job_name}' job!"
+    end
   end
 
   private
