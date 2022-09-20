@@ -54,6 +54,12 @@ class NomadJobExecutor
     end
   end
 
+  def get_job_spec(where, job_name)
+    gateway.ssh(where, user, keys: ["/id_rsa"]) do |ssh|
+      ssh.exec!("cat /etc/nomad/jobs.d/#{job_name}.nomad")
+    end
+  end
+
 
 end
 
@@ -86,13 +92,8 @@ class ExtendedNomadClient
     get("/v1/job/#{job_name}")
   rescue ::Nomad::HTTPError
     puts 'Job not found in remote Nomad server, will try run it remotely and retry'
-    @gateway.ssh(options[:related_service], user, keys: ['/id_rsa']) do |ssh|
-      puts "Executing `nomad run /etc/nomad/jobs.d/#{job_name}.nomad` in remote location"
-
-      # FIXME: Generic
-      job_spec = ssh.exec!("cat /etc/nomad/jobs.d/#{job_name}.nomad")
-      post('/v1/jobs/parse', {'JobHCL' => job_spec}.to_json)
-    end
+    @gateway.get_job_spec(options[:related_service], job_name)
+    post('/v1/jobs/parse', { 'JobHCL' => job_spec }.to_json)
   rescue ::Nomad::HTTPError
     puts 'Job not found and in remote Nomad server'
   end
