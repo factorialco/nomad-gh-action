@@ -91,7 +91,7 @@ class ExtendedNomadClient
     get("/v1/job/#{job_name}")
   rescue ::Nomad::HTTPError
     puts 'Job not found in remote Nomad server, will try run it remotely and retry'
-    @executor.get_job_spec(options[:related_service], job_name)
+    job_spec = @executor.get_job_spec(options[:related_service], job_name)
     post('/v1/jobs/parse', { 'JobHCL' => job_spec }.to_json)
   rescue ::Nomad::HTTPError
     puts 'Job not found and in remote Nomad server'
