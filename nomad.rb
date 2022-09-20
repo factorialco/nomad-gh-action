@@ -60,13 +60,12 @@ class NomadJobExecutor
     end
   end
 
-
 end
 
 class ExtendedNomadClient
-  def initialize(original_client, gateway)
+  def initialize(original_client, executor)
     @client = original_client
-    @gateway = gateway
+    @executor = executor
   end
 
   def get_until(path, params, headers, wait_clause, error_clause = Proc.new { |r| })
@@ -92,7 +91,7 @@ class ExtendedNomadClient
     get("/v1/job/#{job_name}")
   rescue ::Nomad::HTTPError
     puts 'Job not found in remote Nomad server, will try run it remotely and retry'
-    @gateway.get_job_spec(options[:related_service], job_name)
+    @executor.get_job_spec(options[:related_service], job_name)
     post('/v1/jobs/parse', { 'JobHCL' => job_spec }.to_json)
   rescue ::Nomad::HTTPError
     puts 'Job not found and in remote Nomad server'
@@ -131,7 +130,7 @@ class ExtendedNomadClient
     wait_status:,
     wait_task_group:
   )
-    response = post("/v1/job/#{job['Name']}", { 'Job' => job , 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
+    response = post("/v1/job/#{job['Name']}", { 'Job' => job, 'EnforceIndex' => job['JobModifyIndex'] }.to_json)
     return Result.ok(response) if wait_status.empty?
 
     eval_id = response[:EvalID]
@@ -161,25 +160,23 @@ class ExtendedNomadClient
   end
 
   def job_error_result(result)
-    begin
-      error_data = nil
-      if result && result.respond_to?(:key?) && result.key?(:data)
-        allocation = result[:data]
-        tasks = allocation[:TaskStates].keys.map(&:to_s)
-        error_data = tasks.map do |task_name|
-          [
-            task_name, {
-              stdout: allocation_log(allocation_id: allocation[:ID],task_name: task_name, type: 'stdout'),
-              stderr: allocation_log(allocation_id: allocation[:ID],task_name: task_name, type: 'stderr'),
-            }
-          ]
-        end.to_h
-      else
-        puts 'There was an error with the allocation'
-        error_data = result.inspect
-      end
-      Result.error(error_data)
+    error_data = nil
+    if result&.key?(:data)
+      allocation = result[:data]
+      tasks = allocation[:TaskStates].keys.map(&:to_s)
+      error_data = tasks.map do |task_name|
+        [
+          task_name, {
+            stdout: allocation_log(allocation_id: allocation[:ID], task_name: task_name, type: 'stdout'),
+            stderr: allocation_log(allocation_id: allocation[:ID], task_name: task_name, type: 'stderr')
+          }
+        ]
+      end.to_h
+    else
+      puts 'There was an error with the allocation'
+      error_data = result.inspect
     end
+    Result.error(error_data)
   end
 
   private
@@ -187,7 +184,7 @@ class ExtendedNomadClient
   def allocation_log(allocation_id:, task_name:, type:)
     data = get("/v1/client/fs/logs/#{allocation_id}?type=#{type}&task=#{task_name}")[:Data]
     Base64.decode64(data)
-  rescue ::Nomad::HTTPClientError,::JSON::ParserError => e
+  rescue ::Nomad::HTTPClientError, ::JSON::ParserError => e
     puts 'There was an error trying to obtain allocation log'
     puts e.inspect
     ''
