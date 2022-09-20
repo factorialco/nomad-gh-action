@@ -43,7 +43,7 @@ class NomadJobExecutor
   def client
     gw_open do |port|
       original_client = Nomad::Client.new(address: "http://localhost:#{port}")
-      client = ExtendedNomadClient.new(original_client, @gateway)
+      client = ExtendedNomadClient.new(original_client, self)
       yield client
     end
   end
